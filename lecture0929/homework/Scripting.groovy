@@ -13,11 +13,43 @@
 
 // Use some of the tricks we've learnt about scripting, like passing parameters to GroovyShell through binding,
 // properties, closure delegates, the 'object.with(Closure)' method, etc.
-
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.CompilationCustomizer
+import org.codehaus.groovy.control.customizers.SecureASTCustomizer
 
 List<String> processNumbers(List<Operation> userInput, List<Integer> numbers) {
-    //Function that runs the provided operations on the provided collection of numbers. Needs to be implemented.
-    // ...
+    CompilationCustomizer mySecurity = new SecureASTCustomizer()
+    mySecurity.receiversClassesBlackList = [System]
+    mySecurity.setStaticImportsWhitelist([]);
+
+    CompilerConfiguration config = new CompilerConfiguration()
+    config.addCompilationCustomizers(mySecurity)
+
+    List currentNumbers = new ArrayList(numbers)
+
+    def binding = new Binding();
+    binding['LENGTH'] = numbers.size();
+    GroovyShell shell = new GroovyShell(binding, config)
+    
+    for (operation in userInput) {
+        try {
+            Closure cl = shell.evaluate('return ' + operation.command) as Closure
+            cl.delegate = shell
+
+            switch(operation.type) {
+                case OperationType.FILTER:
+                    currentNumbers = currentNumbers.findAll(cl)
+                break
+                case OperationType.TRANSFORMATION:
+                    currentNumbers = currentNumbers.collect(cl)
+                break
+            }
+        } catch (e) {
+            println "Processing operation failed '${operation.command}': ${e.message}"
+            throw e;
+        }
+    }
+    return currentNumbers;
 }
 
 
